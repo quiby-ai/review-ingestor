@@ -1,0 +1,24 @@
+[appstore]
+referrer = "https://apps.apple.com/"
+api_host = "https://amp-api-edge.apps.apple.com"
+api_path = "v1/catalog/{country}/apps/{app_id}/reviews"
+limit    = 20
+
+[http]
+timeout_seconds     = 10
+max_retries         = 3
+backoff_initial_sec = 1
+backoff_max_sec     = 60
+user_agents = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+]
+
+[kafka]
+brokers               = ["kafka1:9092"]
+group_id              = "ingestor"
+topic_extract_reviews = "pipeline.extract_reviews"
+topic_prepare_reviews = "pipeline.prepare_reviews"
+topic_failed          = "pipeline.failed"
+
+[postgres]
+dsn = "postgres://user:pass@host:5432/dbname?sslmode=disable"
