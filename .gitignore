@@ -1,8 +1,7 @@
 .idea
 config.toml
 
-!cmd/main.go
-cmd/
+cmd/test_*.go
 
 config/test_config.toml
 
