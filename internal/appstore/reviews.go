@@ -159,7 +159,7 @@ func (r *ReviewFetcher) FetchAllReviews(ctx context.Context, country string, app
 			fetchedCount++
 			newReviewsAdded = true
 
-			if fetchedCount >= opts.MaxLimit {
+			if opts.MaxLimit > 0 && fetchedCount >= opts.MaxLimit {
 				return allReviews, nil
 			}
 		}
@@ -187,7 +187,12 @@ func (r *ReviewFetcher) FetchAllReviews(ctx context.Context, country string, app
 }
 
 func (r *ReviewFetcher) prepareQuery(country, appID string, opts *FetchOptions) (string, map[string]string) {
-	baseURL := fmt.Sprintf("https://amp-api-edge.apps.apple.com/v1/catalog/%s/apps/%s/reviews", country, appID)
+	host := strings.TrimSuffix(r.appStoreCfg.APIHost, "/")
+	path := r.appStoreCfg.APIPath
+	path = strings.ReplaceAll(path, "{country}", url.PathEscape(country))
+	path = strings.ReplaceAll(path, "{app_id}", url.PathEscape(appID))
+	path = strings.TrimPrefix(path, "/")
+	baseURL := fmt.Sprintf("%s/%s", host, path)
 
 	params := url.Values{}
 	params.Set("l", "en-GB")

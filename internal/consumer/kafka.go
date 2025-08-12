@@ -35,3 +35,10 @@ func (kc *KafkaConsumer) Run(ctx context.Context) error {
 		}
 	}
 }
+
+func (kc *KafkaConsumer) Close() error {
+	if kc.reader != nil {
+		return kc.reader.Close()
+	}
+	return nil
+}

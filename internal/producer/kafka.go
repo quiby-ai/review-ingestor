@@ -18,7 +18,7 @@ type KafkaConfig struct {
 func NewKafkaProducer(cfg KafkaConfig) *KafkaProducer {
 	return &KafkaProducer{
 		writer: &kafka.Writer{
-			Addr:     kafka.TCP(cfg.Brokers[0]),
+			Addr:     kafka.TCP(cfg.Brokers...),
 			Topic:    cfg.TopicPrepareReviews,
 			Balancer: &kafka.LeastBytes{},
 		},
@@ -29,4 +29,11 @@ func (p *KafkaProducer) Publish(ctx context.Context, payload []byte) error {
 	return p.writer.WriteMessages(ctx, kafka.Message{
 		Value: payload,
 	})
+}
+
+func (p *KafkaProducer) Close() error {
+	if p.writer != nil {
+		return p.writer.Close()
+	}
+	return nil
 }

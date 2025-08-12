@@ -5,11 +5,9 @@ cmd/test_*.go
 
 config/test_config.toml
 
-internal/appstore/reviews_test.go
-internal/service/integration_test.go
-internal/service/mocks_test.go
-internal/service/ingest_test.go
-internal/storage/postgres_test.go
+internal/appstore/*_test.go
+internal/service/*_test.go
+internal/storage/*_test.go
 
 test_real_api.sh
 test_real_data.sh

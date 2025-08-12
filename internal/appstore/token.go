@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 
 	landingx "github.com/quiby-ai/common/pkg/appstore/landing"
 	tokenx "github.com/quiby-ai/common/pkg/appstore/token"
@@ -28,7 +29,7 @@ func (t *TokenExtractor) ExtractToken(ctx context.Context, country, appName, app
 	if err != nil {
 		return "", fmt.Errorf("extract token failed: %w", err)
 	}
-	if response.Status != 200 {
+	if response.Status != http.StatusOK {
 		return "", fmt.Errorf("unexpected status: %d", response.Status)
 	}
 	token, _, exists := tokenx.ExtractBearerToken(string(response.Body))

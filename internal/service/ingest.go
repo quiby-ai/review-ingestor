@@ -68,9 +68,10 @@ func (s *IngestService) Process(ctx context.Context, payload []byte) error {
 
 	totalCount := 0
 
-	token, err := s.extractor.ExtractToken(ctx, "us", "", req.AppID)
+	tokenCountry := req.Countries[0]
+	token, err := s.extractor.ExtractToken(ctx, tokenCountry, req.AppName, req.AppID)
 	if err != nil {
-		return fmt.Errorf("failed to extract token for country %s: %w", "us", err)
+		return fmt.Errorf("failed to extract token for country %s: %w", tokenCountry, err)
 	}
 
 	s.fetcher.SetToken(token)

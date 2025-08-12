@@ -53,6 +53,7 @@ func run() error {
 type dependencies struct {
 	db       *sql.DB
 	consumer *consumer.KafkaConsumer
+	producer *producer.KafkaProducer
 }
 
 func (d *dependencies) cleanup() {
@@ -60,6 +61,18 @@ func (d *dependencies) cleanup() {
 		log.Println("Closing database connection...")
 		if err := d.db.Close(); err != nil {
 			log.Printf("Error closing database: %v", err)
+		}
+	}
+	if d.consumer != nil {
+		log.Println("Closing Kafka consumer...")
+		if err := d.consumer.Close(); err != nil {
+			log.Printf("Error closing Kafka consumer: %v", err)
+		}
+	}
+	if d.producer != nil {
+		log.Println("Closing Kafka producer...")
+		if err := d.producer.Close(); err != nil {
+			log.Printf("Error closing Kafka producer: %v", err)
 		}
 	}
 }
@@ -89,12 +102,13 @@ func initializeDependencies(cfg *config.Config) (*dependencies, error) {
 	}
 	prod := producer.NewKafkaProducer(prodCfg)
 
-	svc := service.NewIngestServiceWithConcrete(tokenExtractor, reviewFetcher, repo, prod)
+	svc := service.NewIngestService(tokenExtractor, reviewFetcher, repo, prod)
 
 	consumer := consumer.NewKafkaConsumer(cfg.Kafka, svc)
 
 	return &dependencies{
 		db:       db,
 		consumer: consumer,
+		producer: prod,
 	}, nil
 }
