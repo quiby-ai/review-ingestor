@@ -7,9 +7,14 @@ import (
 	"log"
 	"time"
 
+	"github.com/quiby-ai/common/pkg/events"
 	"github.com/quiby-ai/review-ingestor/internal/appstore"
 	"github.com/quiby-ai/review-ingestor/internal/producer"
 	"github.com/quiby-ai/review-ingestor/internal/storage"
+)
+
+var (
+	Limit int = 500
 )
 
 // Interfaces for dependency injection and testing
@@ -30,21 +35,6 @@ type KafkaProducer interface {
 	Publish(ctx context.Context, payload []byte) error
 }
 
-type FetchRequest struct {
-	RequestID string   `json:"request_id"`
-	AppID     string   `json:"app_id"`
-	AppName   string   `json:"app_name"`
-	Countries []string `json:"countries"`
-	DateFrom  string   `json:"date_from"`
-	DateTo    string   `json:"date_to"`
-	Limit     int      `json:"limit"`
-}
-
-type PrepareReviewsEvent struct {
-	RequestID string `json:"request_id"`
-	Count     int    `json:"count"`
-}
-
 type IngestService struct {
 	extractor TokenExtractor
 	fetcher   ReviewFetcher
@@ -57,76 +47,57 @@ func NewIngestService(te *appstore.TokenExtractor, rf *appstore.ReviewFetcher, r
 }
 
 func (s *IngestService) Process(ctx context.Context, payload []byte) error {
-	var req FetchRequest
-	if err := json.Unmarshal(payload, &req); err != nil {
+	var inputEvent events.ExtractRequest
+	if err := json.Unmarshal(payload, &inputEvent); err != nil {
 		return fmt.Errorf("failed to parse request: %w", err)
 	}
 
-	if err := s.validateRequest(req); err != nil {
-		return fmt.Errorf("invalid request: %w", err)
+	if err := inputEvent.Validate(); err != nil {
+		return fmt.Errorf("invalid incoming event: %w", err)
 	}
 
 	totalCount := 0
 
-	tokenCountry := req.Countries[0]
-	token, err := s.extractor.ExtractToken(ctx, tokenCountry, req.AppName, req.AppID)
+	tokenCountry := inputEvent.Countries[0]
+	token, err := s.extractor.ExtractToken(ctx, tokenCountry, inputEvent.AppName, inputEvent.AppID)
 	if err != nil {
 		return fmt.Errorf("failed to extract token for country %s: %w", tokenCountry, err)
 	}
 
 	s.fetcher.SetToken(token)
 
-	for _, country := range req.Countries {
-		count, err := s.handleReviewsByCountry(ctx, req, country, req.Limit)
+	for _, country := range inputEvent.Countries {
+		count, err := s.handleReviewsByCountry(ctx, inputEvent, country, Limit)
 		if err != nil {
 			return fmt.Errorf("failed to process country %s: %w", country, err)
 		}
 		totalCount += count
 	}
 
-	prepareEvent := PrepareReviewsEvent{
-		RequestID: req.RequestID,
-		Count:     totalCount,
+	outputEvent := events.ExtractCompleted{
+		ExtractRequest: inputEvent,
+		Count:          totalCount,
 	}
-	if err := s.publishEvent(ctx, prepareEvent); err != nil {
+	if err := s.publishEvent(ctx, outputEvent); err != nil {
 		return fmt.Errorf("failed to publish prepare reviews event: %w", err)
 	}
 
-	log.Printf("Successfully processed request %s: fetched %d reviews", req.RequestID, totalCount)
+	log.Printf("Successfully processed event -> fetched %d reviews", totalCount)
 	return nil
 }
 
-func (s *IngestService) validateRequest(req FetchRequest) error {
-	if req.RequestID == "" {
-		return fmt.Errorf("request_id is required")
-	}
-	if req.AppID == "" {
-		return fmt.Errorf("app_id is required")
-	}
-	if len(req.Countries) == 0 {
-		return fmt.Errorf("at least one country is required")
-	}
-	return nil
-}
+func (s *IngestService) handleReviewsByCountry(ctx context.Context, event events.ExtractRequest, country string, maxLimit int) (int, error) {
+	log.Printf("Processing country: %s for app: %s", country, event.AppID)
 
-func (s *IngestService) handleReviewsByCountry(ctx context.Context, req FetchRequest, country string, maxLimit int) (int, error) {
-	log.Printf("Processing country: %s for app: %s", country, req.AppID)
-
-	var afterDate *time.Time
-	if req.DateFrom != "" {
-		if parsed, err := time.Parse("2006-01-02", req.DateFrom); err == nil {
-			afterDate = &parsed
-		}
-	}
-
+	afterDate, _ := time.Parse("2006-01-02", event.DateFrom)
 	opts := &appstore.FetchOptions{
 		Limit:    20,
 		Offset:   0,
-		After:    afterDate,
+		After:    &afterDate,
 		MaxLimit: maxLimit,
 	}
 
-	reviews, err := s.fetcher.FetchAllReviews(ctx, country, req.AppID, opts)
+	reviews, err := s.fetcher.FetchAllReviews(ctx, country, event.AppID, opts)
 	if err != nil {
 		return 0, fmt.Errorf("failed to fetch reviews for country %s: %w", country, err)
 	}
@@ -150,7 +121,7 @@ func (s *IngestService) handleReviewsByCountry(ctx context.Context, req FetchReq
 		if err := s.repo.SaveRawReview(
 			ctx,
 			review.ID,
-			req.AppID,
+			event.AppID,
 			country,
 			review.Attributes.Rating,
 			review.Attributes.Title,
@@ -167,7 +138,7 @@ func (s *IngestService) handleReviewsByCountry(ctx context.Context, req FetchReq
 	return len(reviews), nil
 }
 
-func (s *IngestService) publishEvent(ctx context.Context, event interface{}) error {
+func (s *IngestService) publishEvent(ctx context.Context, event events.ExtractCompleted) error {
 	data, err := json.Marshal(event)
 	if err != nil {
 		return fmt.Errorf("failed to marshal event: %w", err)

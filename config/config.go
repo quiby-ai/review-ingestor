@@ -30,22 +30,18 @@ type HTTPConfig struct {
 }
 
 type KafkaConfig struct {
-	Brokers             []string `mapstructure:"brokers"`
-	GroupID             string   `mapstructure:"group_id"`
-	TopicExtractReviews string   `mapstructure:"topic_extract_reviews"`
-	TopicPrepareReviews string   `mapstructure:"topic_prepare_reviews"`
-	TopicFailed         string   `mapstructure:"topic_failed"`
+	Brokers []string `mapstructure:"brokers"`
+	GroupID string   `mapstructure:"group_id"`
 }
 
 type PostgresConfig struct {
 	DSN string `mapstructure:"dsn"`
 }
 
-func LoadConfig() (*Config, error) {
+func Load() (*Config, error) {
 	viper.SetConfigName("config")
 	viper.SetConfigType("toml")
 	viper.AddConfigPath(".")
-	viper.AddConfigPath("./config")
 
 	setDefaults()
 
@@ -87,9 +83,6 @@ func setDefaults() {
 
 	viper.SetDefault("kafka.brokers", []string{"localhost:9092"})
 	viper.SetDefault("kafka.group_id", "ingestor")
-	viper.SetDefault("kafka.topic_extract_reviews", "pipeline.extract_reviews")
-	viper.SetDefault("kafka.topic_prepare_reviews", "pipeline.prepare_reviews")
-	viper.SetDefault("kafka.topic_failed", "pipeline.failed")
 
 	viper.SetDefault("postgres.dsn", "postgres://user:pass@localhost:5432/dbname?sslmode=disable")
 }
@@ -154,15 +147,6 @@ func (k *KafkaConfig) Validate() error {
 	}
 	if k.GroupID == "" {
 		return fmt.Errorf("group_id is required")
-	}
-	if k.TopicExtractReviews == "" {
-		return fmt.Errorf("topic_extract_reviews is required")
-	}
-	if k.TopicPrepareReviews == "" {
-		return fmt.Errorf("topic_prepare_reviews is required")
-	}
-	if k.TopicFailed == "" {
-		return fmt.Errorf("topic_failed is required")
 	}
 	return nil
 }

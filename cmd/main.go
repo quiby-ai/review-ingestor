@@ -30,7 +30,7 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	cfg, err := config.LoadConfig()
+	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
@@ -96,11 +96,7 @@ func initializeDependencies(cfg *config.Config) (*dependencies, error) {
 
 	repo := storage.NewReviewRepository(db)
 
-	prodCfg := producer.KafkaConfig{
-		Brokers:             cfg.Kafka.Brokers,
-		TopicPrepareReviews: cfg.Kafka.TopicPrepareReviews,
-	}
-	prod := producer.NewKafkaProducer(prodCfg)
+	prod := producer.NewKafkaProducer(cfg.Kafka)
 
 	svc := service.NewIngestService(tokenExtractor, reviewFetcher, repo, prod)
 

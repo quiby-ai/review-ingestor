@@ -14,11 +14,8 @@ user_agents = [
 ]
 
 [kafka]
-brokers               = ["kafka1:9092"]
-group_id              = "ingestor"
-topic_extract_reviews = "pipeline.extract_reviews"
-topic_prepare_reviews = "pipeline.prepare_reviews"
-topic_failed          = "pipeline.failed"
+brokers     = ["kafka:9092"]
+group_id    = "ingestor"
 
 [postgres]
 dsn = "postgres://user:pass@host:5432/dbname?sslmode=disable"

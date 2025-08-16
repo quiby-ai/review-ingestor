@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 
+	"github.com/quiby-ai/common/pkg/events"
 	"github.com/quiby-ai/review-ingestor/config"
 	"github.com/quiby-ai/review-ingestor/internal/service"
 	"github.com/segmentio/kafka-go"
@@ -17,7 +18,7 @@ type KafkaConsumer struct {
 func NewKafkaConsumer(cfg config.KafkaConfig, svc *service.IngestService) *KafkaConsumer {
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers: cfg.Brokers,
-		Topic:   cfg.TopicExtractReviews,
+		Topic:   events.PipelineExtractRequest,
 		GroupID: cfg.GroupID,
 	})
 	return &KafkaConsumer{reader: reader, svc: svc}

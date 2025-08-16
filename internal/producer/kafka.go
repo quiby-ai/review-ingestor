@@ -3,6 +3,8 @@ package producer
 import (
 	"context"
 
+	"github.com/quiby-ai/common/pkg/events"
+	"github.com/quiby-ai/review-ingestor/config"
 	"github.com/segmentio/kafka-go"
 )
 
@@ -10,16 +12,11 @@ type KafkaProducer struct {
 	writer *kafka.Writer
 }
 
-type KafkaConfig struct {
-	Brokers             []string
-	TopicPrepareReviews string
-}
-
-func NewKafkaProducer(cfg KafkaConfig) *KafkaProducer {
+func NewKafkaProducer(cfg config.KafkaConfig) *KafkaProducer {
 	return &KafkaProducer{
 		writer: &kafka.Writer{
 			Addr:     kafka.TCP(cfg.Brokers...),
-			Topic:    cfg.TopicPrepareReviews,
+			Topic:    events.PipelineExtractCompleted,
 			Balancer: &kafka.LeastBytes{},
 		},
 	}
