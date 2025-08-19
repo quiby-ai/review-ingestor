@@ -1,5 +1,4 @@
 .idea
-config.toml
 
 cmd/test_*.go
 
@@ -15,5 +14,7 @@ REAL_API_VALIDATION.md
 TEST_RESULTS.md
 test.sh
 coverage.html
+
+.env
 
 bin/
