@@ -41,7 +41,7 @@ type PostgresConfig struct {
 func Load() (*Config, error) {
 	viper.SetConfigName("config")
 	viper.SetConfigType("toml")
-	viper.AddConfigPath(".")
+	viper.AddConfigPath("/")
 
 	viper.AutomaticEnv()
 
