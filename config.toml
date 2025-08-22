@@ -1,14 +1,13 @@
 [appstore]
 referrer = "https://apps.apple.com/"
-# api_host configured via APP_STORE_API_HOST in environment secrets
 api_path = "v1/catalog/{country}/apps/{app_id}/reviews"
 limit    = 20
 
 [http]
-timeout_seconds     = 10s
+timeout_seconds     = "10s"
 max_retries         = 3
-backoff_initial_sec = 1s
-backoff_max_sec     = 60s
+backoff_initial_sec = "1s"
+backoff_max_sec     = "60s"
 user_agents = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
