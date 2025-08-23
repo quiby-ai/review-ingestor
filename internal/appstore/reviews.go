@@ -208,7 +208,7 @@ func (r *ReviewFetcher) prepareQuery(country, appID string, opts *FetchOptions) 
 	headers := map[string]string{
 		"accept":             "*/*",
 		"accept-language":    "en-US,en;q=0.9",
-		"Authorization":      fmt.Sprintf("bearer %s", r.token),
+		"Authorization":      r.token,
 		"origin":             "https://apps.apple.com",
 		"referer":            r.appStoreCfg.Referrer,
 		"sec-ch-ua":          `"Not(A:Brand";v="99", "Google Chrome";v="133", "Chromium";v="133"`,
