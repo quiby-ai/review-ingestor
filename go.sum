@@ -35,8 +35,8 @@ github.com/pierrec/lz4/v4 v4.1.15 h1:MO0/ucJhngq7299dKLwIMtgTfbkoSPF6AoMYDd8Q4q0
 github.com/pierrec/lz4/v4 v4.1.15/go.mod h1:gZWDp/Ze/IJXGXf23ltt2EXimqmTUXEy0GFuRQyBid4=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
-github.com/quiby-ai/common v0.0.0-20250816160440-d345d88247ae h1:HfuFrIl5JhGtVLx24iReVL7Savq1koYNNqOCh28If4g=
-github.com/quiby-ai/common v0.0.0-20250816160440-d345d88247ae/go.mod h1:WnD90NvCTcSKbpeXBQmrnnr/TtEZOn43hQB/Eor5P2c=
+github.com/quiby-ai/common v0.0.0-20250823061923-f8faa203f2d1 h1:I/KPIcF9Fme78XcJh56uPRCvC4qHSjOg96j5mrd9Ekg=
+github.com/quiby-ai/common v0.0.0-20250823061923-f8faa203f2d1/go.mod h1:eqZhrxPF0cxFtEKIVANRJ2O4vy5bsfHGzvtHolPQPog=
 github.com/rogpeppe/go-internal v1.9.0 h1:73kH8U+JUqXU8lRuOHeVHaa/SZPifC7BkcraZVejAe8=
 github.com/rogpeppe/go-internal v1.9.0/go.mod h1:WtVeX8xhTBvf0smdhujwtBcq4Qrzq/fJaraNFVN+nFs=
 github.com/sagikazarmark/locafero v0.7.0 h1:5MqpDsTGNDhY8sGp0Aowyf0qKsPrhewaLSsFaodPcyo=

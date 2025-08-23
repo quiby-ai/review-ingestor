@@ -4,7 +4,7 @@ go 1.24.1
 
 require (
 	github.com/lib/pq v1.10.9
-	github.com/quiby-ai/common v0.0.0-20250816160440-d345d88247ae
+	github.com/quiby-ai/common v0.0.0-20250823061923-f8faa203f2d1
 	github.com/segmentio/kafka-go v0.4.48
 	github.com/spf13/viper v1.20.1
 )

@@ -47,10 +47,19 @@ func NewIngestService(te *appstore.TokenExtractor, rf *appstore.ReviewFetcher, r
 }
 
 func (s *IngestService) Process(ctx context.Context, payload []byte) error {
-	var inputEvent events.ExtractRequest
-	if err := json.Unmarshal(payload, &inputEvent); err != nil {
-		return fmt.Errorf("failed to parse request: %w", err)
+	// First unmarshal the full message to extract the payload
+	var fullMessage struct {
+		Payload events.ExtractRequest `json:"payload"`
 	}
+	if err := json.Unmarshal(payload, &fullMessage); err != nil {
+		return fmt.Errorf("failed to parse full message: %w", err)
+	}
+
+	inputEvent := fullMessage.Payload
+
+	// Debug logging to see what was parsed
+	log.Printf("Parsed event - AppID: %q, AppName: %q, Countries: %v, DateFrom: %q, DateTo: %q",
+		inputEvent.AppID, inputEvent.AppName, inputEvent.Countries, inputEvent.DateFrom, inputEvent.DateTo)
 
 	if err := inputEvent.Validate(); err != nil {
 		return fmt.Errorf("invalid incoming event: %w", err)
