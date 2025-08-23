@@ -19,7 +19,7 @@ var (
 
 // Interfaces for dependency injection and testing
 type TokenExtractor interface {
-	ExtractToken(ctx context.Context, country, platform, appID string) (string, error)
+	ExtractToken(ctx context.Context, country, appName, appID string) (string, error)
 }
 
 type ReviewFetcher interface {
