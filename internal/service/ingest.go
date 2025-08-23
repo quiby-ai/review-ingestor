@@ -32,7 +32,8 @@ type ReviewRepository interface {
 }
 
 type KafkaProducer interface {
-	Publish(ctx context.Context, payload []byte) error
+	PublishEvent(ctx context.Context, key []byte, envelope events.Envelope[any]) error
+	BuildEnvelope(event events.ExtractCompleted, sagaID string) events.Envelope[any]
 }
 
 type IngestService struct {
@@ -42,18 +43,20 @@ type IngestService struct {
 	producer  KafkaProducer
 }
 
-func NewIngestService(te *appstore.TokenExtractor, rf *appstore.ReviewFetcher, repo *storage.ReviewRepository, prod *producer.KafkaProducer) *IngestService {
+func NewIngestService(te *appstore.TokenExtractor, rf *appstore.ReviewFetcher, repo *storage.ReviewRepository, prod *producer.Producer) *IngestService {
 	return &IngestService{extractor: te, fetcher: rf, repo: repo, producer: prod}
 }
 
 func (s *IngestService) Process(ctx context.Context, payload []byte) error {
 	var fullMessage struct {
+		SagaID  string                `json:"saga_id"`
 		Payload events.ExtractRequest `json:"payload"`
 	}
 	if err := json.Unmarshal(payload, &fullMessage); err != nil {
 		return fmt.Errorf("failed to parse full message: %w", err)
 	}
 	inputEvent := fullMessage.Payload
+	sagaID := fullMessage.SagaID
 
 	if err := inputEvent.Validate(); err != nil {
 		return fmt.Errorf("invalid incoming event: %w", err)
@@ -82,7 +85,7 @@ func (s *IngestService) Process(ctx context.Context, payload []byte) error {
 		ExtractRequest: inputEvent,
 		Count:          totalCount,
 	}
-	if err := s.publishEvent(ctx, outputEvent); err != nil {
+	if err := s.publishEvent(ctx, outputEvent, sagaID); err != nil {
 		return fmt.Errorf("failed to publish prepare reviews event: %w", err)
 	}
 
@@ -142,10 +145,7 @@ func (s *IngestService) handleReviewsByCountry(ctx context.Context, event events
 	return len(reviews), nil
 }
 
-func (s *IngestService) publishEvent(ctx context.Context, event events.ExtractCompleted) error {
-	data, err := json.Marshal(event)
-	if err != nil {
-		return fmt.Errorf("failed to marshal event: %w", err)
-	}
-	return s.producer.Publish(ctx, data)
+func (s *IngestService) publishEvent(ctx context.Context, event events.ExtractCompleted, sagaID string) error {
+	envelope := s.producer.BuildEnvelope(event, sagaID)
+	return s.producer.PublishEvent(ctx, []byte(sagaID), envelope)
 }

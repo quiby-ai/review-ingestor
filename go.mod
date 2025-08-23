@@ -3,6 +3,7 @@ module github.com/quiby-ai/review-ingestor
 go 1.24.1
 
 require (
+	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9
 	github.com/quiby-ai/common v0.0.0-20250823061923-f8faa203f2d1
 	github.com/segmentio/kafka-go v0.4.48

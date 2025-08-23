@@ -53,7 +53,7 @@ func run() error {
 type dependencies struct {
 	db       *sql.DB
 	consumer *consumer.KafkaConsumer
-	producer *producer.KafkaProducer
+	producer *producer.Producer
 }
 
 func (d *dependencies) cleanup() {
@@ -96,7 +96,7 @@ func initializeDependencies(cfg *config.Config) (*dependencies, error) {
 
 	repo := storage.NewReviewRepository(db)
 
-	prod := producer.NewKafkaProducer(cfg.Kafka)
+	prod := producer.NewProducer(cfg.Kafka)
 
 	svc := service.NewIngestService(tokenExtractor, reviewFetcher, repo, prod)
 
