@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -47,25 +46,15 @@ func NewIngestService(te *appstore.TokenExtractor, rf *appstore.ReviewFetcher, r
 	return &IngestService{extractor: te, fetcher: rf, repo: repo, producer: prod}
 }
 
-func (s *IngestService) Process(ctx context.Context, payload []byte) error {
-	var fullMessage struct {
-		SagaID  string                `json:"saga_id"`
-		Payload events.ExtractRequest `json:"payload"`
-	}
-	if err := json.Unmarshal(payload, &fullMessage); err != nil {
-		return fmt.Errorf("failed to parse full message: %w", err)
-	}
-	inputEvent := fullMessage.Payload
-	sagaID := fullMessage.SagaID
-
-	if err := inputEvent.Validate(); err != nil {
+func (s *IngestService) Handle(ctx context.Context, evt events.ExtractRequest, sagaID string) error {
+	if err := evt.Validate(); err != nil {
 		return fmt.Errorf("invalid incoming event: %w", err)
 	}
 
 	totalCount := 0
 
-	tokenCountry := inputEvent.Countries[0]
-	token, err := s.extractor.ExtractToken(ctx, tokenCountry, inputEvent.AppName, inputEvent.AppID)
+	tokenCountry := evt.Countries[0]
+	token, err := s.extractor.ExtractToken(ctx, tokenCountry, evt.AppName, evt.AppID)
 	if err != nil {
 		return fmt.Errorf("failed to extract token for country %s: %w", tokenCountry, err)
 	}
@@ -73,8 +62,8 @@ func (s *IngestService) Process(ctx context.Context, payload []byte) error {
 
 	s.fetcher.SetToken(token)
 
-	for _, country := range inputEvent.Countries {
-		count, err := s.handleReviewsByCountry(ctx, inputEvent, country, Limit)
+	for _, country := range evt.Countries {
+		count, err := s.handleReviewsByCountry(ctx, evt, country, Limit)
 		if err != nil {
 			return fmt.Errorf("failed to process country %s: %w", country, err)
 		}
@@ -82,7 +71,7 @@ func (s *IngestService) Process(ctx context.Context, payload []byte) error {
 	}
 
 	outputEvent := events.ExtractCompleted{
-		ExtractRequest: inputEvent,
+		ExtractRequest: evt,
 		Count:          totalCount,
 	}
 	if err := s.publishEvent(ctx, outputEvent, sagaID); err != nil {

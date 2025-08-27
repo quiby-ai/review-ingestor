@@ -2,44 +2,39 @@ package consumer
 
 import (
 	"context"
-	"log"
+	"fmt"
 
 	"github.com/quiby-ai/common/pkg/events"
 	"github.com/quiby-ai/review-ingestor/config"
 	"github.com/quiby-ai/review-ingestor/internal/service"
-	"github.com/segmentio/kafka-go"
 )
 
+type IngestServiceProcessor struct {
+	svc *service.IngestService
+}
+
+func (p *IngestServiceProcessor) Handle(ctx context.Context, payload any, sagaID string) error {
+	if evt, ok := payload.(events.ExtractRequest); ok {
+		return p.svc.Handle(ctx, evt, sagaID)
+	}
+	return fmt.Errorf("invalid payload type for preprocess service")
+}
+
 type KafkaConsumer struct {
-	reader *kafka.Reader
-	svc    *service.IngestService
+	consumer *events.KafkaConsumer
 }
 
 func NewKafkaConsumer(cfg config.KafkaConfig, svc *service.IngestService) *KafkaConsumer {
-	reader := kafka.NewReader(kafka.ReaderConfig{
-		Brokers: cfg.Brokers,
-		Topic:   events.PipelineExtractRequest,
-		GroupID: cfg.GroupID,
-	})
-	return &KafkaConsumer{reader: reader, svc: svc}
+	consumer := events.NewKafkaConsumer(cfg.Brokers, events.PipelineExtractRequest, cfg.GroupID)
+	processor := &IngestServiceProcessor{svc: svc}
+	consumer.SetProcessor(processor)
+	return &KafkaConsumer{consumer: consumer}
 }
 
 func (kc *KafkaConsumer) Run(ctx context.Context) error {
-	for {
-		m, err := kc.reader.ReadMessage(ctx)
-		if err != nil {
-			return err
-		}
-		log.Printf("received message: %s", string(m.Value))
-		if err := kc.svc.Process(ctx, m.Value); err != nil {
-			log.Printf("processing error: %v", err)
-		}
-	}
+	return kc.consumer.Run(ctx)
 }
 
 func (kc *KafkaConsumer) Close() error {
-	if kc.reader != nil {
-		return kc.reader.Close()
-	}
-	return nil
+	return kc.consumer.Close()
 }
