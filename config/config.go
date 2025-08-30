@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/quiby-ai/review-ingestor/internal/logger"
 	"github.com/spf13/viper"
 )
 
@@ -12,6 +13,7 @@ type Config struct {
 	HTTP     HTTPConfig
 	Kafka    KafkaConfig
 	Postgres PostgresConfig
+	Logging  logger.Config
 }
 
 type AppStoreConfig struct {
@@ -61,6 +63,9 @@ func Load() (*Config, error) {
 	viper.BindEnv("PG_DSN")
 	viper.BindEnv("APP_STORE_API_HOST")
 
+	viper.BindEnv("logging.level", "LOG_LEVEL")
+	viper.BindEnv("logging.format", "LOG_FORMAT")
+
 	if err := viper.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
@@ -86,7 +91,18 @@ func Load() (*Config, error) {
 			BackoffMax:     viper.GetDuration("http.backoff_max_sec"),
 			UserAgents:     viper.GetStringSlice("http.user_agents"),
 		},
+		Logging: logger.Config{
+			Level:  getStringWithDefault("logging.level", "info"),
+			Format: getStringWithDefault("logging.format", "json"),
+		},
 	}
 
 	return config, nil
+}
+
+func getStringWithDefault(key, defaultValue string) string {
+	if value := viper.GetString(key); value != "" {
+		return value
+	}
+	return defaultValue
 }

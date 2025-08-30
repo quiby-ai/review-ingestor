@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/quiby-ai/review-ingestor/config"
+	"github.com/quiby-ai/review-ingestor/internal/logger"
 
 	"github.com/quiby-ai/common/pkg/httpx"
 )
@@ -71,26 +72,34 @@ func (r *ReviewFetcher) FetchReviews(ctx context.Context, country, appID string,
 		}
 	}
 
+	timer := logger.StartTimer()
 	requestURL, headers := r.prepareQuery(country, appID, opts)
+
+	logger.Debug(ctx, "Fetching reviews from App Store", "country", country, "limit", opts.Limit, "offset", opts.Offset)
 
 	response, err := r.http.DoGET(ctx, requestURL, nil, headers)
 	if err != nil {
+		logger.LogEventWithLatency(ctx, "appstore.reviews.request", "failed", timer(), "country", country, "error", "http_request_failed")
 		return nil, fmt.Errorf("failed to fetch reviews: %w", err)
 	}
 
 	if response.Status == 404 {
+		logger.LogEventWithLatency(ctx, "appstore.reviews.request", "failed", timer(), "country", country, "status", 404)
 		return nil, fmt.Errorf("app not found or not available in country %s", country)
 	}
 
 	if response.Status != 200 {
+		logger.LogEventWithLatency(ctx, "appstore.reviews.request", "failed", timer(), "country", country, "status", response.Status)
 		return nil, fmt.Errorf("unexpected status code: %d", response.Status)
 	}
 
 	var reviewsResp ReviewsResponse
 	if err := json.Unmarshal(response.Body, &reviewsResp); err != nil {
+		logger.LogEventWithLatency(ctx, "appstore.reviews.request", "failed", timer(), "country", country, "error", "json_parse_failed")
 		return nil, fmt.Errorf("failed to parse JSON response: %w", err)
 	}
 
+	logger.LogEventWithLatency(ctx, "appstore.reviews.request", "success", timer(), "country", country, "reviews_count", len(reviewsResp.Data))
 	return &reviewsResp, nil
 }
 
@@ -130,9 +139,11 @@ func (r *ReviewFetcher) FetchAllReviews(ctx context.Context, country string, app
 		if err != nil {
 			if strings.Contains(strings.ToLower(err.Error()), "429") || strings.Contains(strings.ToLower(err.Error()), "too many") {
 				if currentRetries >= maxRetries {
+					logger.LogEvent(ctx, "appstore.retry.backoff", "failed", "attempt", currentRetries, "max_retries", maxRetries)
 					return allReviews, fmt.Errorf("maximum retry attempts exceeded: %w", err)
 				}
 
+				logger.LogEvent(ctx, "appstore.rate_limited", "retrying", "attempt", currentRetries, "backoff_delay", backoffDelay.Seconds())
 				time.Sleep(backoffDelay)
 				backoffDelay = time.Duration(math.Min(float64(backoffDelay*2), float64(maxBackoffDelay)))
 				currentRetries++

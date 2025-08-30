@@ -3,11 +3,11 @@ package service
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/quiby-ai/common/pkg/events"
 	"github.com/quiby-ai/review-ingestor/internal/appstore"
+	"github.com/quiby-ai/review-ingestor/internal/logger"
 	"github.com/quiby-ai/review-ingestor/internal/producer"
 	"github.com/quiby-ai/review-ingestor/internal/storage"
 )
@@ -47,43 +47,59 @@ func NewIngestService(te *appstore.TokenExtractor, rf *appstore.ReviewFetcher, r
 }
 
 func (s *IngestService) Handle(ctx context.Context, evt events.ExtractRequest, sagaID string) error {
+	timer := logger.StartTimer()
+
+	logger.LogEvent(ctx, "service.ingest.started", "in_progress", "countries", len(evt.Countries))
+
 	if err := evt.Validate(); err != nil {
+		logger.LogEventWithLatency(ctx, "service.ingest.completed", "failed", timer(), "error", "validation_failed")
 		return fmt.Errorf("invalid incoming event: %w", err)
 	}
 
 	totalCount := 0
 
 	tokenCountry := evt.Countries[0]
+	tokenTimer := logger.StartTimer()
 	token, err := s.extractor.ExtractToken(ctx, tokenCountry, evt.AppName, evt.AppID)
 	if err != nil {
+		logger.LogEventWithLatency(ctx, "service.token.extracted", "failed", tokenTimer(), "country", tokenCountry)
+		logger.LogEventWithLatency(ctx, "service.ingest.completed", "failed", timer(), "error", "token_extraction_failed")
 		return fmt.Errorf("failed to extract token for country %s: %w", tokenCountry, err)
 	}
-	fmt.Printf("got token: %s\n", token)
+	logger.LogEventWithLatency(ctx, "service.token.extracted", "success", tokenTimer(), "country", tokenCountry)
 
 	s.fetcher.SetToken(token)
 
 	for _, country := range evt.Countries {
+		countryTimer := logger.StartTimer()
 		count, err := s.handleReviewsByCountry(ctx, evt, country, Limit)
 		if err != nil {
+			logger.LogEventWithLatency(ctx, "service.country.processed", "failed", countryTimer(), "country", country)
+			logger.LogEventWithLatency(ctx, "service.ingest.completed", "failed", timer(), "error", "country_processing_failed")
 			return fmt.Errorf("failed to process country %s: %w", country, err)
 		}
+		logger.LogEventWithLatency(ctx, "service.country.processed", "success", countryTimer(), "country", country, "reviews_count", count)
 		totalCount += count
 	}
 
+	publishTimer := logger.StartTimer()
 	outputEvent := events.ExtractCompleted{
 		ExtractRequest: evt,
 		Count:          totalCount,
 	}
 	if err := s.publishEvent(ctx, outputEvent, sagaID); err != nil {
+		logger.LogEventWithLatency(ctx, "producer.event.published", "failed", publishTimer())
+		logger.LogEventWithLatency(ctx, "service.ingest.completed", "failed", timer(), "error", "event_publish_failed")
 		return fmt.Errorf("failed to publish prepare reviews event: %w", err)
 	}
+	logger.LogEventWithLatency(ctx, "producer.event.published", "success", publishTimer())
 
-	log.Printf("Successfully processed event -> fetched %d reviews", totalCount)
+	logger.LogEventWithLatency(ctx, "service.ingest.completed", "success", timer(), "total_reviews", totalCount)
 	return nil
 }
 
 func (s *IngestService) handleReviewsByCountry(ctx context.Context, event events.ExtractRequest, country string, maxLimit int) (int, error) {
-	log.Printf("Processing country: %s for app: %s", country, event.AppID)
+	logger.Debug(ctx, "Processing country", "country", country, "app_id", event.AppID)
 
 	afterDate, _ := time.Parse("2006-01-02", event.DateFrom)
 	opts := &appstore.FetchOptions{
@@ -93,15 +109,21 @@ func (s *IngestService) handleReviewsByCountry(ctx context.Context, event events
 		MaxLimit: maxLimit,
 	}
 
+	fetchTimer := logger.StartTimer()
 	reviews, err := s.fetcher.FetchAllReviews(ctx, country, event.AppID, opts)
 	if err != nil {
+		logger.LogEventWithLatency(ctx, "service.reviews.fetched", "failed", fetchTimer(), "country", country)
 		return 0, fmt.Errorf("failed to fetch reviews for country %s: %w", country, err)
 	}
+	logger.LogEventWithLatency(ctx, "service.reviews.fetched", "success", fetchTimer(), "country", country, "count", len(reviews))
 
+	successCount := 0
 	for _, review := range reviews {
+		reviewCtx := logger.WithReviewID(ctx, review.ID)
+
 		reviewDate, err := time.Parse("2006-01-02T15:04:05Z", review.Attributes.Date)
 		if err != nil {
-			log.Printf("Failed to parse review date: %v", err)
+			logger.Warn(reviewCtx, "Failed to parse review date", "error", err.Error())
 			continue
 		}
 
@@ -114,8 +136,9 @@ func (s *IngestService) handleReviewsByCountry(ctx context.Context, event events
 			responseContent = &review.Attributes.DeveloperResponse.Body
 		}
 
+		saveTimer := logger.StartTimer()
 		if err := s.repo.SaveRawReview(
-			ctx,
+			reviewCtx,
 			review.ID,
 			event.AppID,
 			country,
@@ -126,11 +149,14 @@ func (s *IngestService) handleReviewsByCountry(ctx context.Context, event events
 			responseDate,
 			responseContent,
 		); err != nil {
-			log.Printf("Failed to save review %s: %v", review.ID, err)
+			logger.LogEventWithLatency(reviewCtx, "storage.review.saved", "failed", saveTimer(), "country", country)
+		} else {
+			logger.LogEventWithLatency(reviewCtx, "storage.review.saved", "success", saveTimer(), "country", country)
+			successCount++
 		}
 	}
 
-	log.Printf("Fetched and stored %d reviews for country %s", len(reviews), country)
+	logger.Info(ctx, "Country processing completed", "country", country, "fetched", len(reviews), "saved", successCount)
 	return len(reviews), nil
 }
 

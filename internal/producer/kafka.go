@@ -5,6 +5,7 @@ import (
 
 	"github.com/quiby-ai/common/pkg/events"
 	"github.com/quiby-ai/review-ingestor/config"
+	"github.com/quiby-ai/review-ingestor/internal/logger"
 )
 
 type Producer struct {
@@ -21,7 +22,18 @@ func (p *Producer) Close() error {
 }
 
 func (p *Producer) PublishEvent(ctx context.Context, key []byte, envelope events.Envelope[any]) error {
-	return p.producer.PublishEvent(ctx, key, envelope)
+	timer := logger.StartTimer()
+
+	logger.Debug(ctx, "Publishing event", "message_id", envelope.MessageID)
+
+	err := p.producer.PublishEvent(ctx, key, envelope)
+	if err != nil {
+		logger.LogEventWithLatency(ctx, "producer.event.published", "failed", timer(), "message_id", envelope.MessageID)
+		return err
+	}
+
+	logger.LogEventWithLatency(ctx, "producer.event.published", "success", timer(), "message_id", envelope.MessageID)
+	return nil
 }
 
 func (p *Producer) BuildEnvelope(event events.ExtractCompleted, sagaID string) events.Envelope[any] {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/quiby-ai/common/pkg/events"
 	"github.com/quiby-ai/review-ingestor/config"
+	"github.com/quiby-ai/review-ingestor/internal/logger"
 	"github.com/quiby-ai/review-ingestor/internal/service"
 )
 
@@ -14,9 +15,25 @@ type IngestServiceProcessor struct {
 }
 
 func (p *IngestServiceProcessor) Handle(ctx context.Context, payload any, sagaID string) error {
+	ctx = logger.WithSagaID(ctx, sagaID)
+
+	logger.Debug(ctx, "Kafka message received", "saga_id", sagaID)
+
 	if evt, ok := payload.(events.ExtractRequest); ok {
-		return p.svc.Handle(ctx, evt, sagaID)
+		ctx = logger.WithAppID(ctx, evt.AppID)
+		logger.LogEvent(ctx, "kafka.message.decoded", "success", "app_id", evt.AppID)
+
+		err := p.svc.Handle(ctx, evt, sagaID)
+		if err != nil {
+			logger.LogEvent(ctx, "kafka.message.processed", "failed")
+			return err
+		}
+
+		logger.LogEvent(ctx, "kafka.message.processed", "success")
+		return nil
 	}
+
+	logger.LogEvent(ctx, "kafka.message.decoded", "failed", "reason", "invalid_payload_type")
 	return fmt.Errorf("invalid payload type for preprocess service")
 }
 

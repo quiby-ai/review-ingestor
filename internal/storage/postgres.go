@@ -8,6 +8,7 @@ import (
 
 	_ "github.com/lib/pq"
 	"github.com/quiby-ai/review-ingestor/config"
+	"github.com/quiby-ai/review-ingestor/internal/logger"
 )
 
 func InitPostgres(cfg config.PostgresConfig) (*sql.DB, error) {
@@ -76,6 +77,21 @@ func (r *ReviewRepository) SaveRawReview(ctx context.Context, id, appID, country
 		INSERT INTO raw_reviews (id, app_id, country, rating, title, content, reviewed_at, response_date, response_content)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		ON CONFLICT (id) DO NOTHING;`
-	_, err := r.db.ExecContext(ctx, query, id, appID, country, rating, title, content, reviewedAt, responseDate, responseContent)
-	return err
+
+	timer := logger.StartTimer()
+	result, err := r.db.ExecContext(ctx, query, id, appID, country, rating, title, content, reviewedAt, responseDate, responseContent)
+
+	if err != nil {
+		logger.LogEventWithLatency(ctx, "storage.review.saved", "failed", timer(), "review_id", id)
+		return err
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		logger.LogEventWithLatency(ctx, "storage.review.duplicate", "skipped", timer(), "review_id", id)
+	} else {
+		logger.LogEventWithLatency(ctx, "storage.review.saved", "success", timer(), "review_id", id)
+	}
+
+	return nil
 }
